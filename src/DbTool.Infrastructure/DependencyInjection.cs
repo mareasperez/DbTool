@@ -22,6 +22,11 @@ public static class DependencyInjection
         {
             var settings = sp.GetService<Microsoft.Extensions.Options.IOptions<DbToolSettings>>();
             var configPath = dbPath ?? settings?.Value.Database.ConfigDatabasePath;
+            
+            // Ensure empty strings are treated as null
+            if (string.IsNullOrWhiteSpace(configPath))
+                configPath = null;
+            
             return new AppDbContext(configPath);
         });
 

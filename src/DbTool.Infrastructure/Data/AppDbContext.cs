@@ -25,14 +25,22 @@ public class AppDbContext : IDisposable
         _connection = new SqliteConnection($"Data Source={_dbPath}");
         _connection.Open();
         
+        // Configure SQLite for immediate writes
+        _connection.Execute("PRAGMA journal_mode=DELETE;");
+        _connection.Execute("PRAGMA synchronous=FULL;");
+        
         InitializeDatabase();
     }
 
     private static string GetDefaultDbPath()
     {
-        // Use the directory where the executable is located for better portability
-        var exeDirectory = AppContext.BaseDirectory;
-        return Path.Combine(exeDirectory, "config.db");
+        // Use AppContext.BaseDirectory which points to the executable directory
+        var baseDir = AppContext.BaseDirectory;
+        
+        // Remove trailing slash if present
+        baseDir = baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        
+        return Path.Combine(baseDir, "config.db");
     }
 
     private void InitializeDatabase()
