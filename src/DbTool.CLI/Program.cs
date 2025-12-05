@@ -1,10 +1,16 @@
 using System.CommandLine;
+using System.Text;
 using DbTool.Application.DTOs;
 using DbTool.Application.Interfaces;
 using DbTool.Application.Settings;
 using DbTool.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
+// Configure console encoding for Windows to support Unicode characters
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
+
 
 // Load configuration
 var configuration = new ConfigurationBuilder()
