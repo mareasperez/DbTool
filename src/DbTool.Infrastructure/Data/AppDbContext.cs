@@ -30,8 +30,9 @@ public class AppDbContext : IDisposable
 
     private static string GetDefaultDbPath()
     {
-        var appDataPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appDataPath, "DbTool", "config.db");
+        // Use the directory where the executable is located for better portability
+        var exeDirectory = AppContext.BaseDirectory;
+        return Path.Combine(exeDirectory, "config.db");
     }
 
     private void InitializeDatabase()
