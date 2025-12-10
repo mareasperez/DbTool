@@ -5,11 +5,16 @@ using System.Linq;
 using Avalonia.Markup.Xaml;
 using DbTool.UI.ViewModels;
 using DbTool.UI.Views;
+using System;
+using Microsoft.Extensions.DependencyInjection;
+using DbTool.Application.Interfaces;
 
 namespace DbTool.UI;
 
 public partial class App : Avalonia.Application
 {
+    public static IServiceProvider? ServiceProvider { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -22,9 +27,20 @@ public partial class App : Avalonia.Application
             // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
             // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
             DisableAvaloniaDataAnnotationValidation();
+            
+            // Ensure ServiceProvider is initialized
+            if (ServiceProvider == null)
+            {
+                throw new InvalidOperationException("ServiceProvider was not initialized. Call ConfigureServices before initializing the app.");
+            }
+            
+            // Get services from DI container
+            var dbService = ServiceProvider.GetRequiredService<IDatabaseConnectionService>();
+            var backupService = ServiceProvider.GetRequiredService<IBackupService>();
+            
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(),
+                DataContext = new MainWindowViewModel(dbService, backupService),
             };
         }
 

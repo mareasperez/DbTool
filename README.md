@@ -1,7 +1,7 @@
 # DbTool
 
 > **Multi-Engine Database Backup & Restore Tool**  
-> Cross-platform • Zero Dependencies • Native .NET Drivers
+> Cross-platform • Zero Dependencies • Native .NET Drivers • CLI & GUI
 
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -11,6 +11,20 @@
 ---
 
 ## 🚀 Quick Start
+
+### Using the GUI (Desktop Application)
+
+```powershell
+# Build and run the UI
+dotnet run --project src/DbTool.UI
+```
+
+The GUI provides a user-friendly interface with three main sections:
+- **Connections**: Manage database connections (add, test, delete)
+- **Backup**: Create and view backups for your databases
+- **Restore**: Restore databases from backup files
+
+### Using the CLI
 
 ```powershell
 # Build the project
@@ -63,7 +77,28 @@ dotnet run --project src/DbTool.CLI -- list-backups --db prod
 
 ## 📖 Usage
 
-### Database Connection Management
+### GUI Application
+
+The DbTool GUI provides an intuitive interface for managing database operations:
+
+#### Connections Tab
+- **Add Connection**: Fill in the form with connection details (name, engine, host, port, database, username, password)
+- **View Connections**: See all configured database connections in a list
+- **Test Connection**: Verify connectivity to a selected database
+- **Delete Connection**: Remove a database connection
+
+#### Backup Tab
+- **Create Backup**: Select a connection and optionally specify an output directory
+- **View Backup History**: Browse all backups for the selected connection with timestamps and file sizes
+- **Refresh List**: Update the backup history view
+
+#### Restore Tab
+- **Restore Database**: Select a connection and backup file to restore
+- **Safety Warning**: Clear warnings about data overwrite operations
+
+### CLI Commands
+
+#### Database Connection Management
 
 ```powershell
 # Add a new connection
@@ -84,9 +119,12 @@ dotnet run --project src/DbTool.CLI -- db test --name <connection-name>
 
 # Delete a connection
 dotnet run --project src/DbTool.CLI -- db delete --name <connection-name>
+
+# View configuration information
+dotnet run --project src/DbTool.CLI -- db info
 ```
 
-### Backup Operations
+#### Backup Operations
 
 ```powershell
 # Create a backup
@@ -99,7 +137,7 @@ dotnet run --project src/DbTool.CLI -- backup --db <connection-name> --output /p
 dotnet run --project src/DbTool.CLI -- list-backups --db <connection-name>
 ```
 
-### Restore Operations
+#### Restore Operations
 
 ```powershell
 # Restore from a backup file (with confirmation prompt)
@@ -121,14 +159,20 @@ DbTool/
 │   ├── DbTool.Domain/          # Entities, Enums, Interfaces (pure C#)
 │   ├── DbTool.Application/     # DTOs, Service Interfaces, Validators
 │   ├── DbTool.Infrastructure/  # Repositories, Providers, Services
-│   └── DbTool.CLI/             # Command-line interface
+│   ├── DbTool.CLI/             # Command-line interface
+│   └── DbTool.UI/              # Avalonia GUI application
 └── tests/
     ├── DbTool.Domain.Tests/
     ├── DbTool.Application.Tests/
     └── DbTool.Infrastructure.Tests/
 ```
 
-**Dependency Flow**: `CLI → Application → Infrastructure → Domain`
+**Dependency Flow**: `CLI/UI → Application → Infrastructure → Domain`
+
+The UI application uses:
+- **Avalonia 11.3.9** - Cross-platform XAML-based UI framework
+- **CommunityToolkit.Mvvm 8.2.1** - MVVM helpers and commands
+- **Microsoft.Extensions.DependencyInjection** - Built-in DI container
 
 ---
 
@@ -149,24 +193,42 @@ cd DbTool
 dotnet restore
 dotnet build
 
-# Run
+# Run the CLI
 dotnet run --project src/DbTool.CLI -- --help
+
+# Run the UI
+dotnet run --project src/DbTool.UI
 ```
 
-### Create Self-Contained Executable
+### Create Self-Contained Executables
+
+#### CLI
 
 ```powershell
 # Windows
-dotnet publish src/DbTool.CLI -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o ./dist/win
+dotnet publish src/DbTool.CLI -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o ./dist/cli-win
 
 # Linux
-dotnet publish src/DbTool.CLI -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o ./dist/linux
+dotnet publish src/DbTool.CLI -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o ./dist/cli-linux
 
 # macOS
-dotnet publish src/DbTool.CLI -c Release -r osx-x64 --self-contained -p:PublishSingleFile=true -o ./dist/mac
+dotnet publish src/DbTool.CLI -c Release -r osx-x64 --self-contained -p:PublishSingleFile=true -o ./dist/cli-mac
 ```
 
-The executable will be in the `dist` folder (~70MB, includes all dependencies).
+#### GUI
+
+```powershell
+# Windows
+dotnet publish src/DbTool.UI -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o ./dist/ui-win
+
+# Linux
+dotnet publish src/DbTool.UI -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o ./dist/ui-linux
+
+# macOS
+dotnet publish src/DbTool.UI -c Release -r osx-x64 --self-contained -p:PublishSingleFile=true -o ./dist/ui-mac
+```
+
+The executables will be in the `dist` folder (CLI ~70MB, UI ~80MB, includes all dependencies).
 
 ---
 
@@ -214,6 +276,7 @@ Backups are generated as **plain SQL files** containing:
 - **Application**: Use cases, DTOs, and service contracts
 - **Infrastructure**: Database implementations, providers, and services
 - **CLI**: Command-line interface using System.CommandLine
+- **UI**: Desktop application using Avalonia UI framework
 
 ### Adding a New Database Provider
 
@@ -281,13 +344,13 @@ After the workflow completes, you can edit the draft release notes and publish i
 - [x] Automated releases (GitHub Actions)
 - [x] Multi-platform support (Windows, Linux, macOS)
 - [x] Self-contained single-file executables
+- [x] Full-featured UI with connection management, backup, and restore
 
 ### 🔄 In Progress
-- [ ] Enhance UI features and user experience
+- [ ] Add backup compression support
 - [ ] Add more database providers (Oracle, MongoDB)
 
 ### 📋 Planned
-- [ ] Backup compression (gzip)
 - [ ] Backup encryption
 - [ ] Scheduled backups
 - [ ] Cloud storage integration (Azure, AWS S3)
@@ -296,6 +359,8 @@ After the workflow completes, you can edit the draft release notes and publish i
 - [ ] Backup verification
 - [ ] Incremental backups
 - [ ] Backup diff/comparison tools
+- [ ] File browser dialog in UI for backup selection
+- [ ] Dark mode support in UI
 
 ---
 
@@ -325,6 +390,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Dapper](https://github.com/DapperLib/Dapper) - Micro ORM
 - [FluentValidation](https://fluentvalidation.net/) - Validation library
 - [System.CommandLine](https://github.com/dotnet/command-line-api) - Command-line parsing
+- [Avalonia](https://avaloniaui.net/) - Cross-platform XAML-based UI framework
+- [CommunityToolkit.Mvvm](https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/) - MVVM helpers
 
 ---
 

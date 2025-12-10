@@ -16,6 +16,7 @@ Console.InputEncoding = Encoding.UTF8;
 var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "dbtool-.log");
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
+    .WriteTo.Console(outputTemplate: "{Message:lj}{NewLine}")
     .WriteTo.File(logPath, 
         rollingInterval: RollingInterval.Day,
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
@@ -34,6 +35,9 @@ var services = new ServiceCollection();
 
 // Configure Options Pattern
 services.Configure<DbToolSettings>(configuration.GetSection("DbTool"));
+
+// Register Serilog logger
+services.AddSingleton(Log.Logger);
 
 services.AddInfrastructure();
 var serviceProvider = services.BuildServiceProvider();
@@ -64,16 +68,17 @@ dbAddCommand.AddOption(passwordOption);
 dbAddCommand.SetHandler(async (name, engine, host, port, database, username, password) =>
 {
     var dbService = serviceProvider.GetRequiredService<IDatabaseConnectionService>();
+    var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
     
     try
     {
         var dto = new CreateDatabaseConnectionDto(name, engine, host, port, database, username, password);
         var id = await dbService.CreateDatabaseConnectionAsync(dto);
-        Console.WriteLine($"✓ Database connection '{name}' created successfully (ID: {id})");
+        logger.Information("✓ Database connection '{Name}' created successfully (ID: {Id})", name, id);
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"✗ Error: {ex.Message}");
+        logger.Error(ex, "✗ Error: {Message}", ex.Message);
         Environment.Exit(1);
     }
 }, nameOption, engineOption, hostOption, portOption, databaseOption, usernameOption, passwordOption);
@@ -83,24 +88,26 @@ var dbListCommand = new Command("list", "List all database connections");
 dbListCommand.SetHandler(async () =>
 {
     var dbService = serviceProvider.GetRequiredService<IDatabaseConnectionService>();
+    var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
     
     try
     {
         var connections = await dbService.GetAllDatabaseConnectionsAsync();
         
-        Console.WriteLine("\nConfigured Database Connections:");
-        Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        logger.Information("\nConfigured Database Connections:");
+        logger.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         
         foreach (var conn in connections)
         {
-            Console.WriteLine($"  {conn.Name,-15} | {conn.Engine,-12} | {conn.Host}:{conn.Port}/{conn.DatabaseName}");
+            logger.Information("  {Name,-15} | {Engine,-12} | {Host}:{Port}/{DatabaseName}", 
+                conn.Name, conn.Engine, conn.Host, conn.Port, conn.DatabaseName);
         }
         
-        Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        logger.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"✗ Error: {ex.Message}");
+        logger.Error(ex, "✗ Error: {Message}", ex.Message);
         Environment.Exit(1);
     }
 });
@@ -113,25 +120,26 @@ dbTestCommand.AddOption(testNameOption);
 dbTestCommand.SetHandler(async (name) =>
 {
     var dbService = serviceProvider.GetRequiredService<IDatabaseConnectionService>();
+    var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
     
     try
     {
-        Console.Write($"Testing connection to '{name}'... ");
+        logger.Information("Testing connection to '{Name}'... ", name);
         var success = await dbService.TestConnectionAsync(name);
         
         if (success)
         {
-            Console.WriteLine("✓ Connection successful");
+            logger.Information("✓ Connection successful");
         }
         else
         {
-            Console.WriteLine("✗ Connection failed");
+            logger.Warning("✗ Connection failed");
             Environment.Exit(1);
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"\n✗ Error: {ex.Message}");
+        logger.Error(ex, "\n✗ Error: {Message}", ex.Message);
         Environment.Exit(1);
     }
 }, testNameOption);
@@ -144,6 +152,7 @@ dbDeleteCommand.AddOption(deleteNameOption);
 dbDeleteCommand.SetHandler(async (name) =>
 {
     var dbService = serviceProvider.GetRequiredService<IDatabaseConnectionService>();
+    var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
     
     try
     {
@@ -151,17 +160,17 @@ dbDeleteCommand.SetHandler(async (name) =>
         
         if (deleted)
         {
-            Console.WriteLine($"✓ Database connection '{name}' deleted successfully");
+            logger.Information("✓ Database connection '{Name}' deleted successfully", name);
         }
         else
         {
-            Console.WriteLine($"✗ Database connection '{name}' not found");
+            logger.Warning("✗ Database connection '{Name}' not found", name);
             Environment.Exit(1);
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"✗ Error: {ex.Message}");
+        logger.Error(ex, "✗ Error: {Message}", ex.Message);
         Environment.Exit(1);
     }
 }, deleteNameOption);
@@ -175,6 +184,8 @@ dbCommand.AddCommand(dbDeleteCommand);
 var infoCommand = new Command("info", "Display configuration and paths information");
 infoCommand.SetHandler(() =>
 {
+    var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
+    
     // Replicate logic from AppDbContext.GetDefaultDbPath
     string configDbPath;
     var processPath = Environment.ProcessPath;
@@ -199,14 +210,14 @@ infoCommand.SetHandler(() =>
 
     var logDir = Path.Combine(Path.GetDirectoryName(configDbPath) ?? AppContext.BaseDirectory, "logs");
     
-    Console.WriteLine("\nDbTool Configuration:");
-    Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    Console.WriteLine($"  Executable:     {Environment.ProcessPath}");
-    Console.WriteLine($"  Config DB:      {configDbPath}");
-    Console.WriteLine($"  DB Exists:      {File.Exists(configDbPath)}");
-    Console.WriteLine($"  Log Directory:  {logDir}");
-    Console.WriteLine($"  Version:        0.1.2");
-    Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    logger.Information("\nDbTool Configuration:");
+    logger.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    logger.Information("  Executable:     {ProcessPath}", Environment.ProcessPath);
+    logger.Information("  Config DB:      {ConfigDbPath}", configDbPath);
+    logger.Information("  DB Exists:      {DbExists}", File.Exists(configDbPath));
+    logger.Information("  Log Directory:  {LogDir}", logDir);
+    logger.Information("  Version:        0.1.2");
+    logger.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 });
 
 dbCommand.AddCommand(infoCommand);
@@ -221,27 +232,28 @@ backupCommand.AddOption(backupOutputOption);
 backupCommand.SetHandler(async (dbName, outputDir) =>
 {
     var backupService = serviceProvider.GetRequiredService<IBackupService>();
+    var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
     
     try
     {
-        var progress = new Progress<string>(msg => Console.WriteLine(msg));
+        var progress = new Progress<string>(msg => logger.Information("{Message}", msg));
         var result = await backupService.CreateBackupAsync(dbName, outputDir, progress);
         
         if (result.Success)
         {
-            Console.WriteLine($"\n✓ Backup completed successfully");
-            Console.WriteLine($"  File: {result.FilePath}");
-            Console.WriteLine($"  Size: {result.FileSizeBytes / 1024.0 / 1024.0:F2} MB");
+            logger.Information("\n✓ Backup completed successfully");
+            logger.Information("  File: {FilePath}", result.FilePath);
+            logger.Information("  Size: {SizeMB:F2} MB", result.FileSizeBytes / 1024.0 / 1024.0);
         }
         else
         {
-            Console.WriteLine($"\n✗ Backup failed: {result.ErrorMessage}");
+            logger.Error("\n✗ Backup failed: {ErrorMessage}", result.ErrorMessage);
             Environment.Exit(1);
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"✗ Error: {ex.Message}");
+        logger.Error(ex, "✗ Error: {Message}", ex.Message);
         Environment.Exit(1);
     }
 }, backupDbOption, backupOutputOption);
@@ -254,25 +266,27 @@ listBackupsCommand.AddOption(listBackupsDbOption);
 listBackupsCommand.SetHandler(async (dbName) =>
 {
     var backupService = serviceProvider.GetRequiredService<IBackupService>();
+    var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
     
     try
     {
         var backups = await backupService.ListBackupsAsync(dbName);
         
-        Console.WriteLine($"\nBackups for '{dbName}':");
-        Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        logger.Information("\nBackups for '{DbName}':", dbName);
+        logger.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         
         foreach (var backup in backups)
         {
             var sizeMB = backup.FileSizeBytes / 1024.0 / 1024.0;
-            Console.WriteLine($"  [{backup.Status,-10}] {backup.CreatedAt:yyyy-MM-dd HH:mm} | {sizeMB:F2} MB | {backup.FilePath}");
+            logger.Information("  [{Status,-10}] {CreatedAt:yyyy-MM-dd HH:mm} | {SizeMB:F2} MB | {FilePath}", 
+                backup.Status, backup.CreatedAt, sizeMB, backup.FilePath);
         }
         
-        Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        logger.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"✗ Error: {ex.Message}");
+        logger.Error(ex, "✗ Error: {Message}", ex.Message);
         Environment.Exit(1);
     }
 }, listBackupsDbOption);
@@ -289,13 +303,14 @@ restoreCommand.AddOption(restoreForceOption);
 restoreCommand.SetHandler(async (dbName, backupFile, force) =>
 {
     var backupService = serviceProvider.GetRequiredService<IBackupService>();
+    var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
     
     try
     {
         // Validate file exists
         if (!File.Exists(backupFile))
         {
-            Console.WriteLine($"✗ Error: Backup file not found: {backupFile}");
+            logger.Error("✗ Error: Backup file not found: {BackupFile}", backupFile);
             Environment.Exit(1);
             return;
         }
@@ -303,38 +318,40 @@ restoreCommand.SetHandler(async (dbName, backupFile, force) =>
         // Safety confirmation
         if (!force)
         {
-            Console.WriteLine($"\n⚠️  WARNING: This will restore the database '{dbName}' from:");
-            Console.WriteLine($"   {backupFile}");
-            Console.WriteLine($"\n   This operation will overwrite existing data!");
+            logger.Warning("\n⚠️  WARNING: This will restore the database '{DbName}' from:", dbName);
+            logger.Warning("   {BackupFile}", backupFile);
+            logger.Warning("\n   This operation will overwrite existing data!");
+            
+            // Use Console.Write/ReadLine for interactive user input (not logging)
             Console.Write($"\nContinue? (yes/N): ");
             
             var response = Console.ReadLine()?.Trim().ToLowerInvariant();
             if (response != "yes")
             {
-                Console.WriteLine("Restore cancelled.");
+                logger.Information("Restore cancelled.");
                 Environment.Exit(0);
                 return;
             }
         }
 
-        var progress = new Progress<string>(msg => Console.WriteLine(msg));
+        var progress = new Progress<string>(msg => logger.Information("{Message}", msg));
         var result = await backupService.RestoreBackupAsync(dbName, backupFile, progress);
         
         if (result.Success)
         {
-            Console.WriteLine($"\n✓ Restore completed successfully");
-            Console.WriteLine($"  Database: {result.DatabaseName}");
-            Console.WriteLine($"  From: {result.BackupFilePath}");
+            logger.Information("\n✓ Restore completed successfully");
+            logger.Information("  Database: {DatabaseName}", result.DatabaseName);
+            logger.Information("  From: {BackupFilePath}", result.BackupFilePath);
         }
         else
         {
-            Console.WriteLine($"\n✗ Restore failed: {result.ErrorMessage}");
+            logger.Error("\n✗ Restore failed: {ErrorMessage}", result.ErrorMessage);
             Environment.Exit(1);
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"✗ Error: {ex.Message}");
+        logger.Error(ex, "✗ Error: {Message}", ex.Message);
         Environment.Exit(1);
     }
 }, restoreDbOption, restoreFileOption, restoreForceOption);
