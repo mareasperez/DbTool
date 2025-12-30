@@ -153,9 +153,9 @@ public class PostgresProvider : IDatabaseProvider
     {
         var sql = $@"
             SELECT 
-                'CREATE TABLE ' || table_name || ' (' || 
+                'CREATE TABLE ""' || table_name || '"" (' || 
                 string_agg(
-                    column_name || ' ' || 
+                    '""' || column_name || '"" ' || 
                     CASE 
                         WHEN data_type = 'character varying' THEN 'VARCHAR(' || character_maximum_length || ')'
                         WHEN data_type = 'character' THEN 'CHAR(' || character_maximum_length || ')'
@@ -171,7 +171,7 @@ public class PostgresProvider : IDatabaseProvider
 
         await using var command = new NpgsqlCommand(sql, connection);
         var result = await command.ExecuteScalarAsync(cancellationToken);
-        return result?.ToString() ?? $"-- Could not generate CREATE TABLE for {tableName}";
+        return result?.ToString() ?? $"-- Could not generate CREATE TABLE for \"{tableName}\"";
     }
 
     private static async Task<string> GetTableDataAsInsertStatementsAsync(NpgsqlConnection connection, string tableName, CancellationToken cancellationToken)
@@ -191,14 +191,14 @@ public class PostgresProvider : IDatabaseProvider
         {
             while (await reader.ReadAsync(cancellationToken))
             {
-                columns.Add(reader.GetString(0));
+                columns.Add($"\"" + reader.GetString(0) + "\"");
             }
         }
 
         if (columns.Count == 0) return string.Empty;
 
         // Get data
-        var dataSql = $"SELECT * FROM {tableName}";
+        var dataSql = $"SELECT * FROM \"{tableName}\"";
         await using (var command = new NpgsqlCommand(dataSql, connection))
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
@@ -219,7 +219,7 @@ public class PostgresProvider : IDatabaseProvider
                     }
                 }
 
-                var insertSql = $"INSERT INTO {tableName} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", values)});";
+                var insertSql = $"INSERT INTO \"{tableName}\" ({string.Join(", ", columns)}) VALUES ({string.Join(", ", values)});";
                 insertStatements.AppendLine(insertSql);
             }
         }
