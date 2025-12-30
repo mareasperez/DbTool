@@ -75,6 +75,11 @@ public class PostgresProvider : IDatabaseProvider
 
         progress?.Report($"Starting restore to {DatabaseConnection.DatabaseName}...");
 
+        // Clean database first
+        progress?.Report("Cleaning target database...");
+        await DropAllTablesAsync(DatabaseConnection, cancellationToken);
+        progress?.Report("✓ Database cleaned");
+
         var connectionString = BuildConnectionString(DatabaseConnection);
         var backupSql = await File.ReadAllTextAsync(backupPath, cancellationToken);
 
